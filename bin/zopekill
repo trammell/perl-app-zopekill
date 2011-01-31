@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Cwd 'abs_path';
+use Getopt::Long;
+use Proc::ProcessTable;
+
+my %opt = (yes => undef, 9 => undef, signal => 1, verbose => undef);
+GetOptions(\%opt,'verbose|v+','yes|y');
+if ($opt{9}) {
+    $opt{signal} = 9;       # SIGKILL
+}
+
+my $killpath = abs_path(shift() || '.');
+
+my $pt = Proc::ProcessTable->new;
+
+for my $proc (@{$pt->table}) {
+    next unless $proc->cmndline =~ m{python2.4};
+    next unless $proc->cmndline =~ m{/zope/}i;
+    next if defined($killpath) && $proc->cmndline !~ m{$killpath};
+    if ($opt{yes} || prompt_ok($proc)) {
+        print "killing PID ", $proc->pid, " ...\n\n";
+        $proc->kill($opt{signal});
+    }
+}
+
+sub prompt_ok {
+    my $proc = shift;
+    print $proc->pid, ": ", $proc->cmndline, "\n";
+    print "kill process? (y/N) ";
+    my $ok = <STDIN>;
+    return 1 if $ok =~ /y/;
+    return undef;
+}
+
+=pod
+
+=head1 NAME
+
+zopekill - kill zope processes
+
+=head1 SYNOPSIS
+
+    zopekill [-y] [-9] [--signal=<signal>] <path>
+
+=head1 DESCRIPTION
+
+Kills zope processes running from path C<path>.
+
+=head1 EXAMPLES
+
+Kill all zopes whose executable paths are the current dir:
+
+    zopekill .
+
+Same as above, but don't prompt yes/no.
+
+    zopekill -y .
+
+Same as above, but use C<SIGKILL> instead of C<SIGHUP>.
+
+    zopekill -y -9 .
+
+=cut
